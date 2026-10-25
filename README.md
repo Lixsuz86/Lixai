@@ -120,3 +120,15 @@ Tüm birim, mimari, veri, kuantizasyon, KV-Cache ve benchmark testlerini yürüt
 .\.venv\Scripts\pytest -v
 ```
 
+---
+
+## 📄 Lisans (License)
+
+LixAI, açık kaynak topluluğuna maksimum esneklik ve yasal koruma sağlamak amacıyla **çift lisans (Dual License)** ile sunulmaktadır:
+
+- [MIT License](LICENSE-MIT)
+- [Apache License, Version 2.0](LICENSE-APACHE)
+
+Kullanıcılar ve kurumlar, kendi kullanım amaçlarına ve kurumsal gereksinimlerine göre bu iki lisanstan dilediklerini tercih edebilirler.
+
+
