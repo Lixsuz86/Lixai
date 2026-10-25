@@ -1,0 +1,10 @@
+system:
+  device: "cpu"
+  num_threads: 12
+  seed: 42
+  log_level: "INFO"
+
+paths:
+  data_raw: "data/raw"
+  data_processed: "data/processed"
+  checkpoints: "models/checkpoints"
