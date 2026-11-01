@@ -3,7 +3,7 @@ LixAI Çekirdek Transformer Modeli (Causal Self-Attention Language Model)
 Intel AVX2, Çoklu Thread ve KV Cache (Key-Value Caching) Hızlandırması içerir.
 """
 import math
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Set, Union
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -314,11 +314,20 @@ class LixLanguageModel(nn.Module):
         repetition_penalty: float = 1.0,
         frequency_penalty: float = 0.0,
         presence_penalty: float = 0.0,
+        stop_token_ids: Optional[Union[int, List[int], Set[int]]] = None,
+        include_stop_token: bool = True,
         use_cache: bool = True,
         max_vocab_id: Optional[int] = None,
     ) -> torch.Tensor:
-        """KV Cache, tekrarlama cezası ve dinamik örnekleme (Top-P, Min-P, Top-K) destekli metin üretimi."""
+        """KV Cache, tekrarlama cezası, dinamik örnekleme (Top-P, Min-P) ve stop token / erken durdurma destekli metin üretimi."""
         self.eval()
+
+        stop_set: Optional[Set[int]] = None
+        if stop_token_ids is not None:
+            if isinstance(stop_token_ids, int):
+                stop_set = {stop_token_ids}
+            else:
+                stop_set = set(stop_token_ids)
 
         if not use_cache:
             # Klasik O(T^2) döngüsü
@@ -354,6 +363,11 @@ class LixLanguageModel(nn.Module):
                     probs = torch.clamp(probs, min=1e-9)
                     probs = probs / probs.sum(dim=-1, keepdim=True)
                     next_token = torch.multinomial(probs, num_samples=1)
+
+                if stop_set is not None and all(tok.item() in stop_set for tok in next_token.view(-1)):
+                    if include_stop_token:
+                        input_ids = torch.cat((input_ids, next_token), dim=1)
+                    break
 
                 input_ids = torch.cat((input_ids, next_token), dim=1)
             return input_ids
@@ -396,6 +410,11 @@ class LixLanguageModel(nn.Module):
                 probs = torch.clamp(probs, min=1e-9)
                 probs = probs / probs.sum(dim=-1, keepdim=True)
                 next_token = torch.multinomial(probs, num_samples=1)
+
+            if stop_set is not None and all(tok.item() in stop_set for tok in next_token.view(-1)):
+                if include_stop_token:
+                    input_ids = torch.cat((input_ids, next_token), dim=1)
+                break
 
             input_ids = torch.cat((input_ids, next_token), dim=1)
 

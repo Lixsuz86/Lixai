@@ -2,7 +2,7 @@
 LixAI Bellek-Dostu Veri Yükleyici (Memory-Efficient DataLoader)
 16 GB RAM sınırını aşmamak için bellek tüketimini sabit tutar.
 """
-from typing import Iterator, Tuple, Optional
+from typing import Iterator, Tuple, Optional, Any
 import torch
 from torch.utils.data import IterableDataset
 from src.data.pipeline import TextDataPipeline
@@ -38,6 +38,7 @@ def create_dataloader(
     split: str = "train",
     batch_size: int = 16,
     seq_len: int = 128,
+    tokenizer: Optional[Any] = None,
     max_batches: Optional[int] = None,
     streaming: bool = True,
     repeat_on_end: bool = True,
@@ -48,6 +49,7 @@ def create_dataloader(
         dataset_config=dataset_config,
         split=split,
         seq_len=seq_len,
+        tokenizer=tokenizer,
         streaming=streaming,
         repeat_on_end=repeat_on_end,
     )

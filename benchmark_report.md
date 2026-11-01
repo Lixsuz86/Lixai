@@ -11,10 +11,10 @@
 
 | Konfigürasyon | Thread | KV Cache | ms / Token | Token / Saniye | Bellek Ayak İzi |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **FP32 + KV Cache (Önerilen)** | **12** | **AÇIK** | **9.0 ms** | **111.05 token/sn** | 163.26 MB |
-| **FP32 Standart (Temel)** | 12 | KAPALI | 12.56 ms | 79.63 token/sn | 163.26 MB |
-| **INT8 Dinamik Kuantize** | **12** | **AÇIK** | **7.97 ms** | **125.45 token/sn** | **27.08 MB** |
-| **FP32 (Sınırlı İş Parçacığı)** | 4 | AÇIK | 6.81 ms | 146.78 token/sn | 163.26 MB |
+| **FP32 + KV Cache (Önerilen)** | **12** | **AÇIK** | **32.27 ms** | **30.99 token/sn** | 163.26 MB |
+| **FP32 Standart (Temel)** | 12 | KAPALI | 87.03 ms | 11.49 token/sn | 163.26 MB |
+| **INT8 Dinamik Kuantize** | **12** | **AÇIK** | **61.4 ms** | **16.29 token/sn** | **27.08 MB** |
+| **FP32 (Sınırlı İş Parçacığı)** | 4 | AÇIK | 13.62 ms | 73.41 token/sn | 163.26 MB |
 
 ---
 
@@ -30,8 +30,8 @@
 ## 🚀 3. Temel Optimizasyon Çıkarımları
 
 1. **KV Cache Etkisi**:
-   - Key-Value önbellekleme sayesinde çıkarım gecikmesi **12.56 ms** seviyesinden **9.0 ms** seviyesine indi (**1.4x net hızlanma**).
+   - Key-Value önbellekleme sayesinde çıkarım gecikmesi **87.03 ms** seviyesinden **32.27 ms** seviyesine indi (**2.7x net hızlanma**).
 2. **INT8 Kuantizasyon Kazancı**:
    - 40M parametreli modelin RAM ayak izi **%83.4 oranında küçülerek 27.08 MB** seviyesine geriledi.
 3. **Çoklu Çekirdek (Multi-Threading) Skalası**:
-   - 4 thread'den 12 thread'e çıkıldığında gecikme **6.81 ms -> 9.0 ms** düzeyine çekildi.
+   - 4 thread'den 12 thread'e çıkıldığında gecikme **13.62 ms -> 32.27 ms** düzeyine çekildi.

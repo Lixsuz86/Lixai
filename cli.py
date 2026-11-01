@@ -48,6 +48,8 @@ def main():
     gen_parser.add_argument("--top-p", type=float, default=0.9, help="Top-P nucleus örnekleme eşiği (default: 0.9)")
     gen_parser.add_argument("--min-p", type=float, default=0.05, help="Min-P taban olasılık oranı (default: 0.05)")
     gen_parser.add_argument("--repetition-penalty", "--rep-penalty", type=float, default=1.15, help="Tekrarlama cezası katsayısı (default: 1.15)")
+    gen_parser.add_argument("--stop-tokens", type=str, default=None, help="Virgülle ayrılmış durdurma token ID'leri (örn: 822,3)")
+    gen_parser.add_argument("--stop-words", type=str, default=None, help="Virgülle ayrılmış durdurma kelimeleri (örn: <|endoftext|>,</s>)")
     gen_parser.add_argument("--quantize", action="store_true", help="INT8 hızlandırmalı çıkarım kullan")
     gen_parser.add_argument("--load-best", action="store_true", help="Kaydedilmiş en iyi ağırlıkları yükle (best_model.pt)")
     gen_parser.add_argument("--checkpoint", type=str, default=None, help="Yüklenecek özel checkpoint dosya adı")
@@ -60,6 +62,8 @@ def main():
     chat_parser.add_argument("--top-p", type=float, default=0.9, help="Top-P nucleus örnekleme eşiği (default: 0.9)")
     chat_parser.add_argument("--min-p", type=float, default=0.05, help="Min-P taban olasılık oranı (default: 0.05)")
     chat_parser.add_argument("--repetition-penalty", "--rep-penalty", type=float, default=1.15, help="Tekrarlama cezası katsayısı (default: 1.15)")
+    chat_parser.add_argument("--stop-tokens", type=str, default=None, help="Virgülle ayrılmış durdurma token ID'leri (örn: 822,3)")
+    chat_parser.add_argument("--stop-words", type=str, default=None, help="Virgülle ayrılmış durdurma kelimeleri (örn: <|endoftext|>,</s>)")
     chat_parser.add_argument("--quantize", action="store_true", help="INT8 hızlandırma modunda başlat")
     chat_parser.add_argument("--load-best", action="store_true", help="Kaydedilmiş en iyi ağırlıkları yükle (best_model.pt)")
     chat_parser.add_argument("--checkpoint", type=str, default=None, help="Yüklenecek özel checkpoint dosya adı")
@@ -82,6 +86,14 @@ def main():
 
     ai = LixAI(load_best=load_best, checkpoint_name=getattr(args, "checkpoint", None))
 
+    stop_tokens = None
+    if getattr(args, "stop_tokens", None):
+        stop_tokens = [int(x.strip()) for x in args.stop_tokens.split(",") if x.strip()]
+
+    stop_words = None
+    if getattr(args, "stop_words", None):
+        stop_words = [x.strip() for x in args.stop_words.split(",") if x.strip()]
+
     if args.command == "chat":
         from src.engine.chat import InteractiveChatSession
         session = InteractiveChatSession(
@@ -92,6 +104,8 @@ def main():
             top_p=args.top_p,
             min_p=args.min_p,
             repetition_penalty=args.repetition_penalty,
+            stop_token_ids=stop_tokens,
+            stop_words=stop_words,
             use_quantized=args.quantize,
             checkpoint_name=ai.loaded_checkpoint_name,
         )
@@ -140,6 +154,8 @@ def main():
             top_p=args.top_p,
             min_p=args.min_p,
             repetition_penalty=args.repetition_penalty,
+            stop_token_ids=stop_tokens,
+            stop_words=stop_words,
             use_quantized=args.quantize,
         )
         print("\n--- Üretilen Metin ---")

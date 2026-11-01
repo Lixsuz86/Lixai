@@ -2,7 +2,7 @@
 LixAI Yüksek Seviye Kullanıcı Arayüzü (High-Level Python Interface)
 Model eğitimi, metin üretimi ve optimizasyon işlemlerini tek noktadan yönetir.
 """
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Set, Union
 from pathlib import Path
 import torch
 
@@ -183,10 +183,32 @@ class LixAI:
         repetition_penalty: float = 1.15,
         frequency_penalty: float = 0.0,
         presence_penalty: float = 0.0,
+        stop_token_ids: Optional[Union[int, List[int], Set[int]]] = None,
+        stop_words: Optional[List[str]] = None,
+        include_stop_token: bool = False,
         use_quantized: bool = False,
         use_cache: bool = True,
     ) -> str:
-        """Verilen başlangıç metnine göre otoregresif olarak metin üretir."""
+        """Verilen başlangıç metnine göre erken durdurma (stop tokens/words) destekli metin üretir."""
+        resolved_stop_ids: Set[int] = set()
+        if stop_token_ids is not None:
+            if isinstance(stop_token_ids, int):
+                resolved_stop_ids.add(stop_token_ids)
+            else:
+                resolved_stop_ids.update(stop_token_ids)
+        else:
+            if hasattr(self.tokenizer, "endoftext_token_id") and self.tokenizer.endoftext_token_id is not None:
+                resolved_stop_ids.add(self.tokenizer.endoftext_token_id)
+            if hasattr(self.tokenizer, "eos_token_id") and self.tokenizer.eos_token_id is not None:
+                resolved_stop_ids.add(self.tokenizer.eos_token_id)
+
+        effective_stop_words = list(stop_words) if stop_words is not None else ["<|endoftext|>", "</s>"]
+        for sw in effective_stop_words:
+            if hasattr(self.tokenizer, "token_to_id"):
+                sw_id = self.tokenizer.token_to_id(sw)
+                if sw_id is not None:
+                    resolved_stop_ids.add(sw_id)
+
         model_to_use = quantize_model_cpu(self.model) if use_quantized else self.model
         tokens = self.tokenizer.encode(prompt)
         if not tokens:
@@ -207,10 +229,21 @@ class LixAI:
             repetition_penalty=repetition_penalty,
             frequency_penalty=frequency_penalty,
             presence_penalty=presence_penalty,
+            stop_token_ids=list(resolved_stop_ids) if resolved_stop_ids else None,
+            include_stop_token=include_stop_token,
             use_cache=use_cache,
             max_vocab_id=valid_vocab_limit,
         )
-        return self.tokenizer.decode(out_tokens[0].tolist())
+        decoded = self.tokenizer.decode(out_tokens[0].tolist())
+
+        if not include_stop_token and effective_stop_words:
+            prompt_len = len(prompt)
+            for sw in effective_stop_words:
+                idx = decoded.find(sw, prompt_len)
+                if idx != -1:
+                    decoded = decoded[:idx]
+
+        return decoded
 
     def benchmark(self) -> Dict[str, Any]:
         """FP32 vs INT8 CPU performans karşılaştırmasını döndürür."""

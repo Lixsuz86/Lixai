@@ -11,7 +11,7 @@ def test_smart_checkpoint_auto_load_and_stats():
     # 1. Varsayılan Başlatma (Herhangi bir bayrak verilmeden otomatik en iyi ağırlık tespiti)
     ai_auto = LixAI()
     print(f"\n[KANIT] Otomatik Yüklenen Kontrol Noktası: {ai_auto.loaded_checkpoint_name}")
-    assert ai_auto.loaded_checkpoint_name in ("best_model.pt", "final_model.pt"), (
+    assert ai_auto.loaded_checkpoint_name in ("lixai_chat_sft.pt", "best_sft_model.pt", "best_model.pt", "final_model.pt"), (
         "Diskte model varken LixAI otomatik olarak en iyi ağırlığı tespit edip yüklemelidir!"
     )
 

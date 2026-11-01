@@ -2,7 +2,7 @@
 LixAI Zengin İnteraktif Terminal Sohbet Modülü (Interactive CLI TUI)
 Kelimeleri anlık akış (streaming) halinde ekrana basan, komut destekli REPL oturumu.
 """
-from typing import Optional, List, Dict, Generator, Any
+from typing import Optional, List, Dict, Generator, Any, Set, Union
 import sys
 import time
 import torch
@@ -37,6 +37,8 @@ class InteractiveChatSession:
         min_p: float = 0.05,
         repetition_penalty: float = 1.15,
         frequency_penalty: float = 0.0,
+        stop_token_ids: Optional[Union[int, List[int], Set[int]]] = None,
+        stop_words: Optional[List[str]] = None,
         use_quantized: bool = False,
         checkpoint_name: Optional[str] = None,
     ):
@@ -50,6 +52,25 @@ class InteractiveChatSession:
         self.frequency_penalty = frequency_penalty
         self.use_quantized = use_quantized
         self.checkpoint_name = checkpoint_name
+
+        self.stop_token_ids: Set[int] = set()
+        if stop_token_ids is not None:
+            if isinstance(stop_token_ids, int):
+                self.stop_token_ids.add(stop_token_ids)
+            else:
+                self.stop_token_ids.update(stop_token_ids)
+        else:
+            if hasattr(self.tokenizer, "endoftext_token_id") and self.tokenizer.endoftext_token_id is not None:
+                self.stop_token_ids.add(self.tokenizer.endoftext_token_id)
+            if hasattr(self.tokenizer, "eos_token_id") and self.tokenizer.eos_token_id is not None:
+                self.stop_token_ids.add(self.tokenizer.eos_token_id)
+
+        self.stop_words: List[str] = list(stop_words) if stop_words is not None else ["<|endoftext|>", "</s>"]
+        for sw in self.stop_words:
+            if hasattr(self.tokenizer, "token_to_id"):
+                sw_id = self.tokenizer.token_to_id(sw)
+                if sw_id is not None:
+                    self.stop_token_ids.add(sw_id)
 
         self.active_model = quantize_model_cpu(self.raw_model) if use_quantized else self.raw_model
         self.history: List[str] = []
@@ -126,10 +147,20 @@ class InteractiveChatSession:
                 next_token = torch.multinomial(probs, num_samples=1)
 
             token_id = next_token.item()
+
+            # Erken Durdurma (Stop Token): Durdurma ID'si tespit edildiğinde hemen kes
+            if token_id in self.stop_token_ids:
+                break
+
+            char_or_token = self.tokenizer.decode([token_id])
+
+            # String seviyesinde durdurma deseni kontrolü
+            if any(sw in char_or_token for sw in self.stop_words):
+                break
+
             generated_tokens.append(token_id)
 
             # Yeni tokeni anında ekrana ilet
-            char_or_token = self.tokenizer.decode([token_id])
             if char_or_token:
                 yield char_or_token
             if delay > 0:
@@ -162,6 +193,8 @@ class InteractiveChatSession:
             "min_p": self.min_p,
             "repetition_penalty": self.repetition_penalty,
             "frequency_penalty": self.frequency_penalty,
+            "stop_tokens": sorted(list(self.stop_token_ids)),
+            "stop_words": self.stop_words,
             "history_len": len(self.history) // 2,
             "threads": torch.get_num_threads(),
             "checkpoint": self.checkpoint_name or "Yok (Rastgele Ağırlıklar)",
@@ -171,7 +204,7 @@ class InteractiveChatSession:
         """Terminalde kullanıcı ile canlı döngüyü başlatır."""
         print(f"\n{BOLD}{CYAN}══════════════════════════════════════════════════════════{RESET}")
         print(f"{BOLD}{GREEN} 💬 LixAI İnteraktif Terminal Sohbet Modu (v2.0 SLM) {RESET}")
-        print(f"{CYAN} Komutlar: /help | /stats | /clear | /penalty | /topp | /minp | /quantize | /exit {RESET}")
+        print(f"{CYAN} Komutlar: /help | /stats | /clear | /penalty | /topp | /minp | /stop | /quantize | /exit {RESET}")
         print(f"{BOLD}{CYAN}══════════════════════════════════════════════════════════{RESET}\n")
 
         while True:
@@ -201,7 +234,8 @@ class InteractiveChatSession:
                 print(f"  • Kuantize (INT8): {stats['quantized']}")
                 print(f"  • CPU Thread: {stats['threads']}")
                 print(f"  • Sıcaklık: {stats['temperature']} | Top-K: {stats['top_k']} | Top-P: {stats['top_p']} | Min-P: {stats['min_p']}")
-                print(f"  • Tekrarlama Cezası (Rep Penalty): {stats['repetition_penalty']}\n")
+                print(f"  • Tekrarlama Cezası (Rep Penalty): {stats['repetition_penalty']}")
+                print(f"  • Stop Token IDs: {stats['stop_tokens']} | Stop Kelimeleri: {stats['stop_words']}\n")
                 continue
             elif user_input == "/quantize":
                 self.set_quantization(not self.use_quantized)
@@ -241,15 +275,33 @@ class InteractiveChatSession:
                 else:
                     print(f"{MAGENTA}Mevcut Min-P: {self.min_p}{RESET}")
                 continue
+            elif user_input.startswith("/stop"):
+                parts = user_input.split()
+                if len(parts) > 2 and parts[1] == "add":
+                    try:
+                        val = int(parts[2])
+                        self.stop_token_ids.add(val)
+                        print(f"{MAGENTA}[Stop token ID eklendi: {val}]{RESET}")
+                    except ValueError:
+                        self.stop_words.append(parts[2])
+                        if hasattr(self.tokenizer, "token_to_id"):
+                            tid = self.tokenizer.token_to_id(parts[2])
+                            if tid is not None:
+                                self.stop_token_ids.add(tid)
+                        print(f"{MAGENTA}[Stop kelimesi eklendi: '{parts[2]}']{RESET}")
+                else:
+                    print(f"{MAGENTA}Mevcut Stop Token ID'leri: {sorted(list(self.stop_token_ids))} | Stop Kelimeleri: {self.stop_words}{RESET}")
+                continue
             elif user_input == "/help":
                 print(f"\n{YELLOW}Komut Listesi:{RESET}")
-                print("  /stats     : Donanım ve model durumunu gösterir.")
-                print("  /clear     : Bağlam hafızasını sıfırlar.")
-                print("  /penalty X : Tekrarlama cezasını ayarlar (örn: /penalty 1.25).")
-                print("  /topp X    : Top-P nucleus eşiğini ayarlar (örn: /topp 0.9).")
-                print("  /minp X    : Min-P taban oranını ayarlar (örn: /minp 0.05).")
-                print("  /quantize  : INT8 kuantizasyonunu açar / kapatır.")
-                print("  /exit      : Sohbetten çıkar.\n")
+                print("  /stats        : Donanım ve model durumunu gösterir.")
+                print("  /clear        : Bağlam hafızasını sıfırlar.")
+                print("  /penalty X    : Tekrarlama cezasını ayarlar (örn: /penalty 1.25).")
+                print("  /topp X       : Top-P nucleus eşiğini ayarlar (örn: /topp 0.9).")
+                print("  /minp X       : Min-P taban oranını ayarlar (örn: /minp 0.05).")
+                print("  /stop [add X] : Durdurma tokenlerini gösterir / ekler (örn: /stop add 822).")
+                print("  /quantize     : INT8 kuantizasyonunu açar / kapatır.")
+                print("  /exit         : Sohbetten çıkar.\n")
                 continue
 
             # Streaming Cevap Üretimi

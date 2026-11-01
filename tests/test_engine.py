@@ -26,12 +26,16 @@ def test_training_loop_and_checkpoint(tmp_path):
         num_threads=4,
     )
 
+    from src.data.tokenizer import SimpleCharTokenizer
+    tokenizer = SimpleCharTokenizer()
+
     loader = create_dataloader(
         dataset_name="roneneldan/TinyStories",
         dataset_config=None,
         split="train",
         batch_size=2,
         seq_len=16,
+        tokenizer=tokenizer,
         max_batches=5,
         streaming=True,
     )
